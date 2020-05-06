@@ -363,8 +363,14 @@ FileStreamer::range FileStreamer::bytesRange(const std::string &rangeValue, size
 void FileStreamer::streamFileByChunk(handle * handle, const std::string& filePath, const std::string& mimeType)
 {
   assert(!mimeType.empty());
-  int id = m_playbackCount.Add(1);
   FILE * file = nullptr;
+  if (m_playbackCount.Add(1) == 1)
+  {
+    EventMessage * msg = new EventMessage();
+    msg->event = EVENT_HTTP_STREAM;
+    msg->subject.push_back("STREAMING_STARTED");
+    handle->handler->DispatchEvent(EventMessagePtr(msg));
+  }
 
   if (m_playbackCount.Load() > FILESTREAMER_MAX_PB)
   {
@@ -377,7 +383,7 @@ void FileStreamer::streamFileByChunk(handle * handle, const std::string& filePat
   }
   else
   {
-    DBG(DBG_INFO, "%s: open stream #%d (%s) type (%s)\n", __FUNCTION__, id, filePath.c_str(), mimeType.c_str());
+    DBG(DBG_INFO, "%s: open stream (%s) type (%s)\n", __FUNCTION__, filePath.c_str(), mimeType.c_str());
     size_t tb = 0; // count transfered bytes
     std::string resp;
     resp.assign(RequestBroker::MakeResponseHeader(RequestBroker::Status_OK))
@@ -403,11 +409,17 @@ void FileStreamer::streamFileByChunk(handle * handle, const std::string& filePat
       if (r == 0)
         RequestBroker::Reply(handle, "0\r\n\r\n", 5);
     }
-    DBG(DBG_INFO, "%s: close stream #%d length (%lu)\n", __FUNCTION__, id, (long unsigned)tb);
+    DBG(DBG_INFO, "%s: close stream length (%lu)\n", __FUNCTION__, (long unsigned)tb);
     fclose(file);
   }
 
-  m_playbackCount.Sub(1);
+  if (m_playbackCount.Sub(1) == 0)
+  {
+    EventMessage * msg = new EventMessage();
+    msg->event = EVENT_HTTP_STREAM;
+    msg->subject.push_back("STREAMING_STOPPED");
+    handle->handler->DispatchEvent(EventMessagePtr(msg));
+  }
 }
 
 void FileStreamer::streamFileByRange(handle * handle, const std::string& filePath, const std::string& mimeType, const std::string& rangeValue)
