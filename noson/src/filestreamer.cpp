@@ -22,6 +22,7 @@
 #include "private/debug.h"
 #include "private/urlencoder.h"
 #include "private/tokenizer.h"
+#include "eventhandler.h"
 
 #include <cstring>
 #include <cstdio>
@@ -412,8 +413,14 @@ void FileStreamer::streamFileByChunk(handle * handle, const std::string& filePat
 void FileStreamer::streamFileByRange(handle * handle, const std::string& filePath, const std::string& mimeType, const std::string& rangeValue)
 {
   assert(!mimeType.empty());
-  int id = m_playbackCount.Add(1);
   FILE * file = nullptr;
+  if (m_playbackCount.Add(1) == 1)
+  {
+    EventMessage * msg = new EventMessage();
+    msg->event = EVENT_HTTP_STREAM;
+    msg->subject.push_back("STREAMING_STARTED");
+    handle->handler->DispatchEvent(EventMessagePtr(msg));
+  }
 
   if (m_playbackCount.Load() > FILESTREAMER_MAX_PB)
   {
@@ -426,7 +433,7 @@ void FileStreamer::streamFileByRange(handle * handle, const std::string& filePat
   }
   else
   {
-    DBG(DBG_INFO, "%s: open stream #%d (%s) type (%s) range (%s)\n", __FUNCTION__, id, filePath.c_str(), mimeType.c_str(), rangeValue.c_str());
+    DBG(DBG_INFO, "%s: open stream (%s) type (%s) range (%s)\n", __FUNCTION__, filePath.c_str(), mimeType.c_str(), rangeValue.c_str());
     size_t tb = 0; // count transfered bytes
     size_t flen = getFileLength(file);
     range rg = bytesRange(rangeValue, flen);
@@ -471,11 +478,17 @@ void FileStreamer::streamFileByRange(handle * handle, const std::string& filePat
       Reply500(handle);
       DBG(DBG_WARN, "%s: invalid seek (%s) (%lu-%lu)\n", __FUNCTION__, filePath.c_str(), (long unsigned)rg.start, (long unsigned)rg.end);
     }
-    DBG(DBG_INFO, "%s: close stream #%d length (%lu)\n", __FUNCTION__, id, (long unsigned)tb);
+    DBG(DBG_INFO, "%s: close stream length (%lu)\n", __FUNCTION__, (long unsigned)tb);
     fclose(file);
   }
 
-  m_playbackCount.Sub(1);
+  if (m_playbackCount.Sub(1) == 0)
+  {
+    EventMessage * msg = new EventMessage();
+    msg->event = EVENT_HTTP_STREAM;
+    msg->subject.push_back("STREAMING_STOPPED");
+    handle->handler->DispatchEvent(EventMessagePtr(msg));
+  }
 }
 
 void FileStreamer::Reply500(handle * handle)

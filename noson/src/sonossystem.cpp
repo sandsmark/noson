@@ -70,6 +70,7 @@ System::System(void* CBHandle, EventCB eventCB)
 {
   m_subId = m_eventHandler.CreateSubscription(this);
   m_eventHandler.SubscribeForEvent(m_subId, EVENT_HANDLER_STATUS);
+  m_eventHandler.SubscribeForEvent(m_subId, EVENT_HTTP_STREAM);
   if (!m_eventHandler.Start())
     DBG(DBG_ERROR, "%s: starting event handler failed\n", __FUNCTION__);
   else
@@ -259,10 +260,18 @@ void System::HandleEventMessage(EventMessagePtr msg)
 {
   if (!msg)
     return;
-  if (msg->event == EVENT_HANDLER_STATUS)
+  switch (msg->event)
   {
+  case EVENT_HANDLER_STATUS:
     // @TODO: handle status
     DBG(DBG_DEBUG, "%s: %s\n", __FUNCTION__, msg->subject[0].c_str());
+    break;
+  case EVENT_HTTP_STREAM:
+    // @TODO: handle status
+    DBG(DBG_WARN, "%s: %s\n", __FUNCTION__, msg->subject[0].c_str());
+    break;
+  default:
+    break;
   }
 }
 

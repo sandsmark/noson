@@ -41,6 +41,7 @@ namespace NSROOT
   {
     EVENT_HANDLER_STATUS = 0,     // Internal event: Backend status change
     EVENT_UPNP_PROPCHANGE,        // upnp:propchange
+    EVENT_HTTP_STREAM,            // streaming data over http
     EVENT_UNKNOWN,
   } EVENT_t;
 
